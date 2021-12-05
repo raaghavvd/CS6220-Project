@@ -82,7 +82,7 @@ def CalculateRating(cluster):
     :param cluster: cluster of similar users produced by DBSCAN
     :return: Numpy array of ints, a sum for each genre (ie column) in the cluster matrix.
     """
-    return np.apply_along_axis(np.sum, 0, cluster)
+    return np.sum(cluster, axis=0)
 
 
 
@@ -173,6 +173,7 @@ def get_movie_title_dict():
 
 
 def main():
+    np.random.seed(1)
     movie_title_dict = get_movie_title_dict()
     genre_dict = get_genre_dict()
     movie_genres = get_movie_genres()
@@ -202,7 +203,7 @@ def main():
 
         cluster_votes = Voting(num_clusters, cluster_dict)
         user_recs = make_recommendations(test_matrix, cluster_votes, genre_dict, top_10_movies_per_genre)
-        write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}", user_recs)
+        write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}_min_points_{min_points}", user_recs)
 
 
 
