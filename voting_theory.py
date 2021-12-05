@@ -168,7 +168,7 @@ def assign_user_to_cluster(user, cluster_votes):
 def get_movie_title_dict():
     db = pd.read_csv(".\\ml-100k\\u.item", delimiter="|", header=None, encoding='latin-1')
     db = db.iloc[:, 1:2]
-    return db.to_dict()
+    return db.to_dict()[1]
 
 
 
@@ -202,7 +202,7 @@ def main():
 
         cluster_votes = Voting(num_clusters, cluster_dict)
         user_recs = make_recommendations(test_matrix, cluster_votes, genre_dict, top_10_movies_per_genre)
-        write_dict_to_file(f"top_10_movies_per_user_{eps}", user_recs)
+        write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}", user_recs)
 
 
 
