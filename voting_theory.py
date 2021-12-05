@@ -173,7 +173,7 @@ def get_movie_title_dict():
 
 
 def main():
-    np.random.seed(1)
+    random.seed(1)
     movie_title_dict = get_movie_title_dict()
     genre_dict = get_genre_dict()
     movie_genres = get_movie_genres()
@@ -184,26 +184,23 @@ def main():
     # number of genres
     d = 19
     # epsilon list for DBSCAN
-    eps_list = [0.5, 0.75, 1]
-    min_points = [100, 150, 200]
+    eps_list = [0.2, 0.25, 0.3]
+    min_points = [50, 100, 200]
     train_matrix = create_training_matrix(n, d)
     test_matrix = create_training_matrix(int(n/4), d)
 
     for eps, min_pts in zip(eps_list, min_points):
-        # neighbor_obj = NearestNeighbors(radius=eps)
-        # neighbor_obj.fit(train_matrix)
-        # nieghbors_graph = neighbor_obj.radius_neighbors_graph(train_matrix, mode="distance")
-        # db = DBSCAN(eps=eps, min_samples=min_pts, metric="precomputed", n_jobs=-1).fit(nieghbors_graph)
         db = DBSCAN(eps=eps, min_samples=min_pts, metric="euclidean", n_jobs=-1).fit(train_matrix)
         num_clusters = len(np.unique(db.labels_))
-        cluster_dict = {i: train_matrix[db.labels_ == i] for i in range(num_clusters)}
-        # core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
-        # core_samples_mask[db.core_sample_indices_] = True
-        # labels = db.labels_
+        print(f"Number of Clusters: {num_clusters}")
+        cluster_dict = {}
+        for i in range(num_clusters):
+            cluster_dict[i] = train_matrix[db.labels_ == i]
+            print(f"Cluster {i+1}: {len(cluster_dict[i])}")
 
         cluster_votes = Voting(num_clusters, cluster_dict)
         user_recs = make_recommendations(test_matrix, cluster_votes, genre_dict, top_10_movies_per_genre)
-        write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}_min_points_{min_points}", user_recs)
+        write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}_min_points_{min_pts}", user_recs)
 
 
 
