@@ -1,10 +1,10 @@
 import pandas as pd
 import math
 
-movieFN = "ratings.csv"
+movieFN = "./ml-10M100k/ratings.dat"
 
 
-df = pd.read_csv(movieFN)
+df = pd.read_csv(movieFN, sep="::")
 timestamps = df["Timestamp"].unique().tolist()
 timestamps.sort()
 cutoff = timestamps[math.floor(len(timestamps) * 0.8)]
@@ -27,5 +27,5 @@ for id in movids:
     means.append(MAE[id])
 test["Mean-Prediction"] = means
 
-train.to_csv("ml-1m.train.csv", index=False)
-test.to_csv("ml-1m.test.csv", index=False)
+train.to_csv("ml-10m.train.csv", index=False)
+test.to_csv("ml-10m.test.csv", index=False)
