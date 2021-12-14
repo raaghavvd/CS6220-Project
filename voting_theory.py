@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import random
 import json
-from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import mean_absolute_error
 
 
 MOVIEID = "movie_id"
@@ -43,6 +43,13 @@ def select_genres(genre_map_keys, samples=4):
     return random.sample(genre_map_keys, samples)
 
 
+def create_cluster_matrix(n, d=19, num_genres=4):
+    m = np.empty((n, d))
+    for i in range(n):
+        m[i] = create_user_genre_vector(d, num_genres)
+    return m
+
+
 def create_user_genre_vector(d, num_genres):
     v = np.zeros((d,), dtype="float16")
     genre_index_list = select_genres(range(d), num_genres)
@@ -53,11 +60,25 @@ def create_user_genre_vector(d, num_genres):
     return v
 
 
-def create_training_matrix(n, d=19, num_genres=4):
-    m = np.empty((n, d))
-    for i in range(n):
-        m[i] = create_user_genre_vector(d, num_genres)
-    return m
+def process_data(users, data, genre_matrix, num_genres=19,):
+    unique_movies = np.sort(np.unique(data["movie_id"]))
+    movie_mapping = {movie: index for index, movie in enumerate(unique_movies)}
+    m = np.zeros((len(users), num_genres))
+    pv = np.zeros((len(users), 1), dtype=int)
+    for u in range(len(users)):
+        user_data = data[data.user_id == users[u]]
+        for i in range(len(user_data)):
+            movie_id = user_data.iloc[i, 1]
+            movie_genres = genre_matrix[movie_mapping[movie_id], :]
+            for j in range(len(movie_genres)):
+                if movie_genres[j] > 0:
+                    m[u][j] += 1
+        pv[u] = int(np.argmax(m[u]))
+        m[u] = m[u] / np.sum(m[u])
+
+    return m, pv
+
+
 
 
 def Voting(num_clusters, cluster_dict):
@@ -101,7 +122,7 @@ def get_genre_dict():
 
 def get_movie_genres():
     db = pd.read_csv(".\\ml-100k\\u.item", delimiter="|", header=None, encoding='latin-1')
-    genre_map = db.iloc[:, -19:]
+    genre_map = db.values[:, -19:]
     return genre_map
 
 
@@ -112,9 +133,9 @@ def get_movie_recommendations(user, top_movies_per_genre):
 
 def get_top_10_movies_per_genre(genre_dict, movie_genres, average_ratings, movie_titles):
     top10_dict = {}
-    assert len(movie_genres.iloc[:, 0]) == len(average_ratings)
-    for i in range(len(movie_genres.iloc[:, 0])):
-        all_genres_for_movie = movie_genres.iloc[i, :].values
+    assert len(movie_genres[:, 0]) == len(average_ratings)
+    for i in range(len(movie_genres[:, 0])):
+        all_genres_for_movie = movie_genres[i, :]
         for j in range(len(all_genres_for_movie)):
             if all_genres_for_movie[j] > 0:
                 genre_string = genre_dict[j]
@@ -137,6 +158,21 @@ def get_top_10_movies_per_genre(genre_dict, movie_genres, average_ratings, movie
         top10_dict[key] = top10_movie_names
 
     return top10_dict
+
+
+def predict_ratings(train_data, ratings, training_genre_preferences, movie_genre_matrix):
+    prediction_matrix = np.zeros(train_data.shape)
+    for i in range(train_data.shape[0]):
+        preferred_genre = training_genre_preferences[i]
+        for j in range(train_data.shape[1]):
+            if train_data[i][j] < 1: # user hasn't seen the movie, so make a prediction
+                if movie_genre_matrix[j][preferred_genre] > 1: # is in the user's preferred genre
+                    prediction_matrix[i][j] = ratings[j + 1]
+                else:
+                    prediction_matrix[i][j] = ratings[j + 1]
+
+    return prediction_matrix
+
 
 
 def make_recommendations(user_matrix, cluster_votes, genre_dict, top_movies_per_genre):
@@ -171,35 +207,87 @@ def get_movie_title_dict():
     return db.to_dict()[1]
 
 
+def preferred_movies(genre_preferences, top_10_movies_per_genre, genre_dict):
+    recommendations = np.empty((len(genre_preferences), 10), dtype=int)
+    gp = genre_preferences.squeeze()
+    for i in range(len(genre_preferences)):
+        recommendations[i] = top_10_movies_per_genre[genre_dict[gp[i]]]
+    return recommendations
+
+
+def get_ratings_matrix(data):
+    unique_users = np.sort(np.unique(data["user_id"]))
+    unique_movies = np.sort(np.unique(data["movie_id"]))
+    user_mapping = {user: index for index, user in enumerate(unique_users)}
+    movie_mapping = {movie: index for index, movie in enumerate(unique_movies)}
+    data.loc[:, 'user_id_mapped'] = [user_mapping[user_id] for user_id in data['user_id']]
+    data.loc[:, 'movie_id_mapped'] = [movie_mapping[movie_id] for movie_id in data['movie_id']]
+
+    X = np.zeros((len(unique_users), len(unique_movies)))
+    for i in range(len(unique_users)):
+        cur_users_ratings = pd.DataFrame(data[data.user_id_mapped == i]).reset_index(drop=True)
+        for j in range(len(cur_users_ratings)):
+            movie_index = cur_users_ratings.loc[j, "movie_id_mapped"]
+            rating = cur_users_ratings.iloc[j, 2]
+            X[i][movie_index] = rating
+    return X
+
+
+
 
 def main():
     random.seed(1)
-    movie_title_dict = get_movie_title_dict()
-    genre_dict = get_genre_dict()
-    movie_genres = get_movie_genres()
-    average_ratings = calculate_average_movie_ratings()
-    top_10_movies_per_genre = get_top_10_movies_per_genre(genre_dict, movie_genres, average_ratings, movie_title_dict)
     # number of users
     n = 60000
     # number of genres
     d = 19
+    cluster_matrix = create_cluster_matrix(n, d)
+    raw_data = pd.read_csv("ml-100k/u.data", sep="\t")
+    sorted_by_timestamp = raw_data.sort_values(by=["timestamp"])
+    tao = 0.8
+    timestamp = sorted_by_timestamp.iloc[round(tao * len(sorted_by_timestamp)), -1]
+    training_data = sorted_by_timestamp[sorted_by_timestamp.timestamp < timestamp].sort_values(by=["user_id", "movie_id"])
+    test_data = sorted_by_timestamp[sorted_by_timestamp.timestamp >= timestamp].sort_values(by=["user_id", "movie_id"])
+    train_users = np.sort(pd.unique(training_data.get("user_id")))
+    test_users = np.sort(pd.unique(test_data.get("user_id")))
+    movie_title_dict = get_movie_title_dict()
+    genre_dict = get_genre_dict()
+    movie_genre_matrix = get_movie_genres()
+    average_ratings = calculate_average_movie_ratings()
+    top_10_movies_per_genre = get_top_10_movies_per_genre(genre_dict, movie_genre_matrix, average_ratings, movie_title_dict)
+
+
+    genres_train, training_genre_preferences = process_data(train_users, training_data, movie_genre_matrix)
+    test_matrix, test_genre_preferences = process_data(test_users, test_data, movie_genre_matrix)
+
+    ratings_train = get_ratings_matrix(training_data)
+    ratings_test = get_ratings_matrix(test_data)
+
+
     # epsilon list for DBSCAN
     eps_list = [0.2, 0.25, 0.3]
     min_points = [50, 100, 200]
-    train_matrix = create_training_matrix(n, d)
-    test_matrix = create_training_matrix(int(n/4), d)
+
+
 
     for eps, min_pts in zip(eps_list, min_points):
-        db = DBSCAN(eps=eps, min_samples=min_pts, metric="euclidean", n_jobs=-1).fit(train_matrix)
+        db = DBSCAN(eps=eps, min_samples=min_pts, metric="euclidean", n_jobs=-1).fit(cluster_matrix)
         num_clusters = len(np.unique(db.labels_))
         print(f"Number of Clusters: {num_clusters}")
         cluster_dict = {}
         for i in range(num_clusters):
-            cluster_dict[i] = train_matrix[db.labels_ == i]
-            print(f"Cluster {i+1}: {len(cluster_dict[i])}")
+            cluster_dict[i] = cluster_matrix[db.labels_ == i]
 
         cluster_votes = Voting(num_clusters, cluster_dict)
+
+
         user_recs = make_recommendations(test_matrix, cluster_votes, genre_dict, top_10_movies_per_genre)
+        predictions = predict_ratings(ratings_train, average_ratings, training_genre_preferences, movie_genre_matrix)
+
+        MAE = mean_absolute_error(ratings_train[np.where(ratings_test > 0)], predictions[np.where(ratings_test > 0)])
+
+        print(f"MAE: {MAE}")
+
         write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}_min_points_{min_pts}", user_recs)
 
 
