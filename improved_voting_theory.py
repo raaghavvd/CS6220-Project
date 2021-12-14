@@ -64,6 +64,29 @@ def get_user_genres(data, users, movie_genre_dict, genre_map):
     return scaler.fit_transform(user_genres)
 
 
+def precision_and_recall(y_true_list, y_predict_list):
+    tp = 0
+    fp = 0
+    fn = 0
+    for y_true, y_predict in zip(y_true_list, y_predict_list):
+        if y_true >= 4:
+            if y_predict >= 4:
+                tp += 1
+            else:
+                fn += 1
+        # y_true < 4 here
+        if y_predict >= 4:
+            fp += 1
+
+    assert (tp+fn > 0 and tp + fp > 0)
+
+    precision = tp / (tp+fp)
+    recall = tp / (tp+fn)
+
+    return precision, recall
+
+
+
 
 
 def predict_ratings(prediction_indexes, clusters_dict, ratings, user_cluster_assignment):
@@ -151,19 +174,21 @@ def main():
             test_list = np.where(ratings_test > 0)
             prediction_list = np.round(predict_ratings(test_list, cluster_dict, ratings_train, user_cluster_assignment))
             true_vals_list = ratings_test[np.where(ratings_test > 0)]
-
+            precision, recall = precision_and_recall(true_vals_list, prediction_list)
 
             MAE = mean_absolute_error(true_vals_list, prediction_list)
 
 
-            with open(f"cluster_results_{metric}_eps_{eps}", "w") as _file:
+            with open(f"clustering_results", "a") as _file:
                 _file.write(f"DBSCAN Params:\n"
                             f"    Metric: {metric}\n"
                             f"    EPS: {eps}\n"
                             f"    Min Points:{min_points}\n"
                             f"    Number of Clusters: {clusters}\n"
                             f"    Cluster Sizes: {counts}\n"
-                            f"    MAE: {MAE}\n ")
+                            f"    MAE: {MAE}\n"
+                            f"    Precision: {precision}\n"
+                            f"    Recall: {recall}\n\n\n")
                 _file.close()
 
 
