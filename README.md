@@ -29,7 +29,10 @@ Clear.sh - utility script for cleaning results directory runinference.py - the
 
 
 
-find_optimal_clusters.py produces the SSE vs Cluster count image used in the report
+find_optimal_clusters.py produces the SSE vs Cluster count image used in the report 
+
 hopkins_statistic.py contains the function that was used to calculate the hopkins statistic used in the report
+
 voting_theory.py is the original implementation of the voting theory paper
+
 improved_voting_theory.py is the improved implementation of the voting theory paper.
