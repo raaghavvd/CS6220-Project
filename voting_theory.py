@@ -232,7 +232,26 @@ def get_ratings_matrix(data):
             X[i][movie_index] = rating
     return X
 
+def precision_and_recall(y_true_list, y_predict_list):
+    tp = 0
+    fp = 0
+    fn = 0
+    for y_true, y_predict in zip(y_true_list, y_predict_list):
+        if y_true >= 4:
+            if y_predict >= 4:
+                tp += 1
+            else:
+                fn += 1
+        # y_true < 4 here
+        if y_predict >= 4:
+            fp += 1
 
+    assert (tp+fn > 0 and tp + fp > 0)
+
+    precision = tp / (tp+fp)
+    recall = tp / (tp+fn)
+
+    return precision, recall
 
 
 def main():
@@ -284,9 +303,11 @@ def main():
         user_recs = make_recommendations(test_matrix, cluster_votes, genre_dict, top_10_movies_per_genre)
         predictions = predict_ratings(ratings_train, average_ratings, training_genre_preferences, movie_genre_matrix)
 
-        MAE = mean_absolute_error(ratings_train[np.where(ratings_test > 0)], predictions[np.where(ratings_test > 0)])
-
+        MAE = mean_absolute_error(ratings_test[np.where(ratings_test > 0)], predictions[np.where(ratings_test > 0)])
+        precision, recall = precision_and_recall(ratings_test[np.where(ratings_test > 0)], predictions[np.where(ratings_test > 0)])
         print(f"MAE: {MAE}")
+        print(f"Precision: {precision}")
+        print(f"Recall: {recall}")
 
         write_dict_to_file(f"top_10_movies_per_user_epsilon_{eps}_min_points_{min_pts}", user_recs)
 
