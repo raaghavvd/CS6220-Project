@@ -15,7 +15,11 @@ Imdbinfo.ipynb- Contains the code for the imdb metadata dumper.
 
 DP/Data
 
-HandlePredictions.ipynb - used to collect and process the partial results of the survey paper PREDICTIONS.py - contains the predictions made by the survey paper getNaivePrediction.py - contains naive implementation makeSamples - creates the test and train split reviewConsolidation - database reducing script
+HandlePredictions.ipynb - used to collect and process the partial results of the survey paper 
+PREDICTIONS.py - contains the predictions made by the survey paper
+getNaivePrediction.py - contains naive implementation
+makeSamples - creates the test and train split
+reviewConsolidation - database reducing script
 
 Ml-1m2 - the train and test files
 
